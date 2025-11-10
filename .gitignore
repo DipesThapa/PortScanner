@@ -1,0 +1,33 @@
+# Bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local databases and artifacts
+*.sqlite
+*.db
+
+# Runtime state directories (keep placeholders only)
+baseline-history/*
+!baseline-history/.gitkeep
+tmp-test/*
+!tmp-test/.gitkeep
+web_runs/*
+!web_runs/.gitkeep
+
+# Node / frontend build outputs
+node_modules/
+webapp/frontend/node_modules/
+webapp/frontend/dist/
+webapp/frontend/.vite/
+
+# Misc
+.DS_Store
+Thumbs.db
