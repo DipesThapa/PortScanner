@@ -361,7 +361,7 @@ def _collect_targets(
 def _resolve_scripts(args: argparse.Namespace, config_data: Dict) -> List[str]:
     scripts = None
     config_scripts = config_data.get("scripts")
-    if config_scripts:
+    if config_scripts is not None:
         if isinstance(config_scripts, str):
             scripts = [config_scripts]
         else:
@@ -840,7 +840,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         }
         if diff_results:
             combined["diff"] = diff_results
-    if plugin_output:
+    if plugin_output and output_json:
         combined["plugins"] = plugin_output
         reporting.save_json_report(output_json, combined)
         print(f"[+] Structured report saved to {output_json}")

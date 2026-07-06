@@ -1,18 +1,9 @@
 import PropTypes from "prop-types";
 
-const formatDate = (value) => {
-  if (!value) return "-";
-  try {
-    return new Date(value).toLocaleString();
-  } catch (err) {
-    return value;
-  }
-};
-
 function Dashboard({ scans, loading }) {
   if (loading) {
     return (
-      <section className="dashboard skeleton-grid">
+      <section className="dashboard-grid skeleton-grid">
         {[...Array(4)].map((_, index) => (
           <div key={index} className="skeleton-card" />
         ))}
@@ -20,44 +11,46 @@ function Dashboard({ scans, loading }) {
     );
   }
 
-  const total = scans.length;
   const running = scans.filter((scan) => scan.status === "running").length;
   const failed = scans.filter((scan) => scan.status === "failed").length;
-  const latest = scans[0];
+
+  // Aggregate totals from completed scans
+  let totalHosts = 0;
+  let totalVulns = 0;
+  let totalOpenPorts = 0;
+
+  scans.forEach(scan => {
+    if (scan.summary) {
+      totalHosts += (scan.summary.hosts || 0);
+      totalVulns += (scan.summary.vulnerabilities || 0);
+      totalOpenPorts += (scan.summary.open_ports || 0);
+    }
+  });
+
   return (
-    <section className="dashboard">
-      <div className="card">
-        <h3>Total Jobs</h3>
-        <p>{loading ? "…" : total}</p>
+    <section className="dashboard-grid">
+      <div className="stat-card">
+        <span className="stat-label">Active Jobs</span>
+        <span className={`stat-value ${running > 0 ? "glow" : ""}`} style={{ color: running > 0 ? "var(--status-info)" : "inherit" }}>
+          {running}
+        </span>
       </div>
-      <div className="card">
-        <h3>Running</h3>
-        <p>{loading ? "…" : running}</p>
+
+      <div className="stat-card">
+        <span className="stat-label">Total Vulnerabilities</span>
+        <span className="stat-value" style={{ color: totalVulns > 0 ? "var(--status-error)" : "inherit" }}>
+          {totalVulns}
+        </span>
       </div>
-      <div className="card">
-        <h3>Failed</h3>
-        <p>{loading ? "…" : failed}</p>
+
+      <div className="stat-card">
+        <span className="stat-label">Total Hosts Scanned</span>
+        <span className="stat-value">{totalHosts}</span>
       </div>
-      <div className="card card-wide">
-        <h3>Latest Summary</h3>
-        {latest ? (
-          <ul>
-            <li>
-              <strong>Job:</strong> {latest.job_id}
-            </li>
-            <li>
-              <strong>Status:</strong> {latest.status}
-            </li>
-            <li>
-              <strong>Trend:</strong> {latest.trend || "-"}
-            </li>
-            <li>
-              <strong>Last Updated:</strong> {formatDate(latest.summary?.timestamp)}
-            </li>
-          </ul>
-        ) : (
-          <p>No scans yet. Kick off a new job.</p>
-        )}
+
+      <div className="stat-card">
+        <span className="stat-label">Total Open Ports</span>
+        <span className="stat-value">{totalOpenPorts}</span>
       </div>
     </section>
   );

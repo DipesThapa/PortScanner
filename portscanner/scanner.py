@@ -61,6 +61,9 @@ def build_nmap_command(
     if extra_nmap_args:
         command.extend(extra_nmap_args)
 
+    # "--" terminates nmap option parsing, so a flag-like target (e.g.
+    # "--script=...") can never be interpreted as an argument (defense in depth).
+    command.append("--")
     command.append(target)
     return command
 
@@ -90,7 +93,10 @@ def run_nmap(
     except FileNotFoundError as exc:
         raise NmapNotFoundError("Nmap not found. Please install nmap and try again.") from exc
 
-    success = result.returncode == 0 or (result.stdout and not result.stderr)
+    # Nmap exits 0 on a completed scan (including "host down" results, which are
+    # still valid XML). A non-zero exit means the scan itself failed — treat it as
+    # an error instead of guessing from stdout/stderr contents.
+    success = result.returncode == 0
     return ScanResult(
         target=target,
         command=command,

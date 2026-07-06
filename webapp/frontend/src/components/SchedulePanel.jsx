@@ -30,7 +30,7 @@ function SchedulePanel({ api, onRun }) {
     setError("");
     try {
       const response = await api.get("/schedules");
-      setSchedules(response.data || []);
+      setSchedules(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       setError(err?.response?.data?.detail || err.message);
     } finally {
@@ -160,7 +160,7 @@ function SchedulePanel({ api, onRun }) {
 }
 
 SchedulePanel.propTypes = {
-  api: PropTypes.object.isRequired,
+  api: PropTypes.oneOfType([PropTypes.object, PropTypes.func]).isRequired,
   onRun: PropTypes.func.isRequired,
 };
 

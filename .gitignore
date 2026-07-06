@@ -28,6 +28,18 @@ webapp/frontend/node_modules/
 webapp/frontend/dist/
 webapp/frontend/.vite/
 
+# Vendored binaries (do not commit large/static tool binaries)
+bin/
+
+# Secrets and local credential material
+.api_key
+web_runs/.api_key
+*.pem
+*.key
+secrets.json
+credentials.json
+.env
+
 # Misc
 .DS_Store
 Thumbs.db
