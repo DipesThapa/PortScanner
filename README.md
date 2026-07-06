@@ -13,7 +13,7 @@ web application for launching and reviewing scans.
 > ⚠️ **Authorized use only.** Scan systems you own or have explicit written
 > permission to test. See [SECURITY.md](SECURITY.md).
 
-📝 **Write-up:** [*I shipped an unauthenticated RCE in my own port scanner — here's the whole chain, and how I killed it*](https://dev.to/dipesthapa/i-shipped-an-unauthenticated-rce-in-my-own-port-scanner-heres-the-whole-chain-and-how-i-killed-35kl)
+📝 **Write-up:** [*Hardening my own Nmap web UI: the security holes I shipped, and what actually saved me*](https://dev.to/dipesthapa/i-shipped-an-unauthenticated-rce-in-my-own-port-scanner-heres-the-whole-chain-and-how-i-killed-35kl)
 (dev.to) · [source](docs/writeup-rce-to-hardened.md)
 
 ---
