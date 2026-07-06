@@ -75,3 +75,25 @@ Registry maintainers are selective, and an audit-tier heuristic may get feedback
 
 Either way, you end up with a citable artifact. The merged upstream PR is the
 bonus, not the only prize.
+
+---
+
+## Second rule: `ml-unsafe-model-deserialization` (CWE-502)
+
+Also verified (`semgrep --test` → `✓ All tests passed`). Files:
+`ml-unsafe-model-deserialization.yaml` + `.py`.
+
+Detects loading ML artifacts through pickle-backed deserialisers on non-safe
+paths — `torch.load(...)` without `weights_only=True`, `joblib.load`,
+`numpy.load(..., allow_pickle=True)`, `pandas.read_pickle`, `dill.load(s)`. This
+is the model-file attack surface behind many AI/ML CVEs, so it pairs naturally
+with the huntr hunt.
+
+**Before submitting:** search the registry for existing coverage
+(`torch.load` / pickle rules may already exist). Frame the PR around the
+**consolidated ML-loader set + the `weights_only=True` safe-form exclusion**,
+which generic pickle rules usually miss. Suggested path:
+`python/ml/security/audit/ml-unsafe-model-deserialization.yaml` (confirm against
+the repo's current layout; set the `id` to match the dotted path). If the
+registry already covers it well, publish this one to **your own Semgrep Registry
+account** instead — still a citable artifact with your name on it.

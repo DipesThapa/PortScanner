@@ -1,0 +1,41 @@
+rules:
+  - id: ml-unsafe-model-deserialization
+    languages: [python]
+    severity: WARNING
+    message: >
+      This loads a machine-learning artifact through a pickle-backed
+      deserialiser. If the file/URL is attacker-controlled, loading it executes
+      arbitrary code (CWE-502) — the model-file attack surface behind many AI/ML
+      CVEs. Prefer safe formats/flags: torch.load(..., weights_only=True),
+      safetensors for weights, numpy.load(..., allow_pickle=False), and never
+      unpickle untrusted joblib/dill/pandas artifacts.
+    metadata:
+      category: security
+      subcategory:
+        - audit
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      cwe:
+        - "CWE-502: Deserialization of Untrusted Data"
+      owasp:
+        - A08:2021 - Software and Data Integrity Failures
+      references:
+        - https://cwe.mitre.org/data/definitions/502.html
+        - https://pytorch.org/docs/stable/generated/torch.load.html
+      technology:
+        - python
+        - pytorch
+        - ml
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern: torch.load(...)
+              - pattern-not: torch.load(..., weights_only=True)
+          - pattern: joblib.load(...)
+          - pattern: pandas.read_pickle(...)
+          - pattern: pd.read_pickle(...)
+          - pattern: dill.load(...)
+          - pattern: dill.loads(...)
+          - pattern: numpy.load(..., allow_pickle=True, ...)
+          - pattern: np.load(..., allow_pickle=True, ...)
