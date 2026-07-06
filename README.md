@@ -13,9 +13,8 @@ web application for launching and reviewing scans.
 > ⚠️ **Authorized use only.** Scan systems you own or have explicit written
 > permission to test. See [SECURITY.md](SECURITY.md).
 
-📝 **Write-up:** *How I found and fixed an unauthenticated RCE chain in this project* —
-<!-- Replace the next line with the published dev.to URL once live -->
-[read the source](docs/writeup-rce-to-hardened.md) · dev.to: `https://dev.to/dipesthapa/…`
+📝 **Write-up:** [*I shipped an unauthenticated RCE in my own port scanner — here's the whole chain, and how I killed it*](https://dev.to/dipesthapa/i-shipped-an-unauthenticated-rce-in-my-own-port-scanner-heres-the-whole-chain-and-how-i-killed-35kl)
+(dev.to) · [source](docs/writeup-rce-to-hardened.md)
 
 ---
 
