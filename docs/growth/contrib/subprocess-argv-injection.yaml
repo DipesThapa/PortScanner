@@ -1,0 +1,43 @@
+rules:
+  - id: subprocess-argv-injection
+    languages: [python]
+    severity: WARNING
+    message: >
+      This subprocess call builds an argv list that includes a non-literal
+      (possibly user-controlled) value but no "--" separator before the
+      positional arguments. Even with shell=False, the invoked program parses
+      its own arguments: if an attacker controls that value, a leading "-" is
+      interpreted as an option (argument injection, CWE-88) — e.g. a scan target
+      of "--script=/tmp/evil" turned into an nmap flag. Add a "--" sentinel
+      before user-controlled positionals and reject values that start with "-".
+    metadata:
+      category: security
+      subcategory:
+        - audit
+      confidence: LOW
+      likelihood: LOW
+      impact: MEDIUM
+      cwe:
+        - "CWE-88: Improper Neutralization of Argument Delimiters in a Command ('Argument Injection')"
+      owasp:
+        - A03:2021 - Injection
+      references:
+        - https://cwe.mitre.org/data/definitions/88.html
+      technology:
+        - python
+    patterns:
+      - pattern-either:
+          - pattern: subprocess.run([..., $VAR, ...], ...)
+          - pattern: subprocess.Popen([..., $VAR, ...], ...)
+          - pattern: subprocess.call([..., $VAR, ...], ...)
+          - pattern: subprocess.check_call([..., $VAR, ...], ...)
+          - pattern: subprocess.check_output([..., $VAR, ...], ...)
+      - metavariable-pattern:
+          metavariable: $VAR
+          patterns:
+            - pattern-not: '"..."'
+      - pattern-not: subprocess.run([..., "--", ...], ...)
+      - pattern-not: subprocess.Popen([..., "--", ...], ...)
+      - pattern-not: subprocess.call([..., "--", ...], ...)
+      - pattern-not: subprocess.check_call([..., "--", ...], ...)
+      - pattern-not: subprocess.check_output([..., "--", ...], ...)
