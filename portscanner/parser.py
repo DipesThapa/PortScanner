@@ -8,6 +8,18 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+# Nmap XML can originate from attacker-controlled hosts, so parse it with
+# defusedxml to block XXE / billion-laughs / external-entity attacks. Fall back
+# to the stdlib parser only if defusedxml is unavailable.
+try:
+    from defusedxml.ElementTree import fromstring as _safe_fromstring
+    from defusedxml.common import DefusedXmlException as _DefusedXmlException
+
+    _PARSE_ERRORS: tuple = (ET.ParseError, _DefusedXmlException)
+except ImportError:  # pragma: no cover - defusedxml should be installed
+    _safe_fromstring = ET.fromstring
+    _PARSE_ERRORS = (ET.ParseError,)
+
 VULNERABLE_TOKEN = "VULNERABLE"
 CVE_REGEX = re.compile(r"CVE-\d{4}-\d{4,7}", re.IGNORECASE)
 
@@ -225,8 +237,8 @@ def parse_nmap_xml(xml_output: str) -> List[Dict[str, Any]]:
     Returns a list of host reports. Raises NmapXMLParseError if parsing fails.
     """
     try:
-        root = ET.fromstring(xml_output)
-    except ET.ParseError as exc:
+        root = _safe_fromstring(xml_output)
+    except _PARSE_ERRORS as exc:
         raise NmapXMLParseError("Failed to parse Nmap XML output.") from exc
 
     hosts = root.findall("host")

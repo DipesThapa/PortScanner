@@ -52,7 +52,7 @@ function NewScanForm({ onSubmit, submitting }) {
     event.preventDefault();
     const payload = {
       targets: form.targets
-        .split(/[\\s,]+/)
+        .split(/[\s,]+/)
         .map(sanitizeTarget)
         .filter(Boolean),
       ports: form.ports || undefined,
@@ -61,7 +61,7 @@ function NewScanForm({ onSubmit, submitting }) {
         .filter((plugin) => plugins[plugin.id])
         .map((plugin) => plugin.id),
       exporters: form.exporters
-        .split(/[\\s,]+/)
+        .split(/[\s,]+/)
         .map((value) => value.trim())
         .filter(Boolean),
     };

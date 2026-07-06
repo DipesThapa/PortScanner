@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
+import re
 import shutil
 import traceback
 import uuid
@@ -32,7 +34,7 @@ class JobManager:
                 if job_uuid in self.jobs:
                     records.append(self.jobs[job_uuid])
                     continue
-                req = ScanRequest.model_validate_json(record.request_json)
+                req = ScanRequest.from_stored(record.request_json)
                 result = ScanResult(
                     job_id=job_uuid,
                     status=record.status,
@@ -55,7 +57,7 @@ class JobManager:
             record = session.get(ScanRecord, str(job_id))
             if not record:
                 return None
-            req = ScanRequest.model_validate_json(record.request_json)
+            req = ScanRequest.from_stored(record.request_json)
             return ScanResult(
                 job_id=job_id,
                 status=record.status,
@@ -95,8 +97,39 @@ class JobManager:
         background.add_task(self._run_job, job_id, req, job_dir)
         return result
 
+    def delete_job(self, job_id: uuid.UUID) -> bool:
+        """Delete a job from memory, disk, and database."""
+        # 1. Remove from memory
+        if job_id in self.jobs:
+            del self.jobs[job_id]
+        
+        # 2. Remove from disk
+        job_dir = job_directory(self.base_dir, job_id)
+        if job_dir.exists():
+            shutil.rmtree(job_dir)
+            
+        # 3. Remove from persistence
+        with get_session() as session:
+            record = session.get(ScanRecord, str(job_id))
+            if record:
+                session.delete(record)
+                session.commit()
+                return True
+        return False  # Or True if we consider "already gone" as success, but let's stick to explicit deletion.
+
+
     def _build_cli_args(self, req: ScanRequest, job_dir: Path) -> List[str]:
         args: List[str] = ["--batch"]
+        # Inject safe config for static binary compatibility. Resolve relative to
+        # the project root (or PORTSCANNER_SAFE_CONFIG) instead of a hardcoded path.
+        safe_config_env = os.getenv("PORTSCANNER_SAFE_CONFIG")
+        if safe_config_env:
+            safe_config = Path(safe_config_env)
+        else:
+            safe_config = Path(__file__).resolve().parent.parent / "config_safe.json"
+        if safe_config.exists():
+            args.extend(["--config", str(safe_config)])
+        
         temp_output_dir = job_dir / "artifacts"
         temp_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -238,6 +271,29 @@ class JobManager:
 
         return vulnerabilities
 
+    # (pattern, replacement) pairs for secret-looking material that must never be
+    # persisted in logs. Applied in order.
+    _REDACTION_RULES = [
+        # Bearer tokens (handle before the generic keyword rule).
+        (re.compile(r"(?i)\bbearer\s+\S+"), "Bearer ***REDACTED***"),
+        # Authorization header value (everything after the colon on that line).
+        (re.compile(r"(?i)\bauthorization\s*[:=]\s*\S.*"), "authorization: ***REDACTED***"),
+        # secret:// references.
+        (re.compile(r"(?i)\bsecret://\S+"), "***REDACTED***"),
+        # key=value / key: value style secrets.
+        (re.compile(r"(?i)\b(password|passwd|pwd|secret|token|api[_-]?key|apikey)\b(\s*[=:]\s*|\s+)(\S+)"),
+         r"\1\2***REDACTED***"),
+    ]
+
+    @classmethod
+    def _redact_logs(cls, text: str) -> str:
+        if not text:
+            return text
+        redacted = text
+        for pattern, replacement in cls._REDACTION_RULES:
+            redacted = pattern.sub(replacement, redacted)
+        return redacted
+
     async def _run_job(self, job_id: uuid.UUID, req: ScanRequest, job_dir: Path):
         result = self.jobs[job_id]
         result.status = "running"
@@ -261,7 +317,9 @@ class JobManager:
             result.message = f"{exc}"
             stderr_buffer.write("\n" + trace)
         finally:
-            result.logs = stdout_buffer.getvalue() + "\n" + stderr_buffer.getvalue()
+            result.logs = self._redact_logs(
+                stdout_buffer.getvalue() + "\n" + stderr_buffer.getvalue()
+            )
 
         result.artifacts = self._collect_artifacts(job_dir)
 

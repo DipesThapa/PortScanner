@@ -7,10 +7,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import create_engine
 
-from webapp import database, main
+from webapp import database, main, security
 from webapp.jobs import JobManager
 from webapp.models import ScanRequest, ScanResult
 from webapp.deepdive import DeepDiveExecutor
+
+API = "/api"
 
 
 @pytest.fixture()
@@ -30,10 +32,20 @@ def test_client(tmp_path: Path):
     main.deep_dive_executor = deep_dive_executor
 
     client = TestClient(main.app)
+    # All /api routes require the API key resolved at import time.
+    client.headers.update({"X-API-Key": security.API_KEY})
     try:
         yield client, job_manager, deep_dive_executor
     finally:
         client.close()
+
+
+def test_deep_dive_requires_api_key(test_client):
+    client, job_manager, _ = test_client
+    job_id = _seed_scan(job_manager)
+    # A request with no key must be rejected before reaching the handler.
+    response = client.get(f"{API}/scans/{job_id}/deepdive", headers={"X-API-Key": ""})
+    assert response.status_code == 401
 
 
 def _seed_scan(job_manager: JobManager) -> uuid.UUID:
@@ -69,7 +81,7 @@ def _seed_scan(job_manager: JobManager) -> uuid.UUID:
 
 def test_allowlist_endpoint(test_client):
     client, _, _ = test_client
-    response = client.get("/deepdive/allowlist/info")
+    response = client.get(f"{API}/deepdive/allowlist/info")
     assert response.status_code == 200
     payload = response.json()
     assert payload["enforced"] is True
@@ -80,13 +92,13 @@ def test_run_deep_dive_allowed_command(test_client):
     client, job_manager, _ = test_client
     job_id = _seed_scan(job_manager)
 
-    response = client.post(f"/scans/{job_id}/deepdive", json={"commands": ["echo hello"]})
+    response = client.post(f"{API}/scans/{job_id}/deepdive", json={"commands": ["echo hello"]})
     assert response.status_code == 200
     tasks = response.json()
     assert len(tasks) == 1
     assert tasks[0]["command"] == "echo hello"
 
-    list_response = client.get(f"/scans/{job_id}/deepdive")
+    list_response = client.get(f"{API}/scans/{job_id}/deepdive")
     assert list_response.status_code == 200
     listed = list_response.json()
     assert len(listed) == 1
@@ -98,7 +110,7 @@ def test_run_deep_dive_rejects_non_allowlisted_command(test_client):
     client, job_manager, _ = test_client
     job_id = _seed_scan(job_manager)
 
-    response = client.post(f"/scans/{job_id}/deepdive", json={"commands": ["curl https://example.com"]})
+    response = client.post(f"{API}/scans/{job_id}/deepdive", json={"commands": ["curl https://example.com"]})
     assert response.status_code == 403
     assert "allowlist" in response.json()["detail"]
 
@@ -107,6 +119,6 @@ def test_run_deep_dive_rejects_unknown_command(test_client):
     client, job_manager, _ = test_client
     job_id = _seed_scan(job_manager)
 
-    response = client.post(f"/scans/{job_id}/deepdive", json={"commands": ["echo other"]})
+    response = client.post(f"{API}/scans/{job_id}/deepdive", json={"commands": ["echo other"]})
     assert response.status_code == 400
     assert "Unsupported command" in response.json()["detail"]

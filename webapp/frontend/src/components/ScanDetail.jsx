@@ -1,73 +1,58 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
+import NetworkGraph from "./NetworkGraph.jsx";
+
+// --- Sub-components (Renderers) ---
 
 const RenderSummary = ({ summary }) => {
-  if (!summary) return <p>No summary yet.</p>;
+  if (!summary) return <p className="text-muted">No summary data available.</p>;
   return (
-    <table className="summary-table">
-      <tbody>
-        {Object.entries(summary).map(([key, value]) => (
-          <tr key={key}>
-            <th>{key}</th>
-            <td>{typeof value === "object" ? JSON.stringify(value) : String(value)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="panel" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+      {Object.entries(summary).map(([key, value]) => (
+        <div key={key} className="flex-row space-between" style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+          <span className="text-secondary" style={{ textTransform: 'capitalize' }}>{key}</span>
+          <span className="text-primary text-mono">{typeof value === "object" ? JSON.stringify(value) : String(value)}</span>
+        </div>
+      ))}
+    </div>
   );
 };
 
-RenderSummary.propTypes = {
-  summary: PropTypes.object,
-};
-
-RenderSummary.defaultProps = {
-  summary: null,
-};
+RenderSummary.propTypes = { summary: PropTypes.object };
 
 const RenderDiff = ({ diff }) => {
-  if (!diff) return <p>No diff available.</p>;
+  if (!diff) return <p className="text-muted">No changes detected from previous scans.</p>;
   return (
     <div className="diff-block">
       {Object.entries(diff).map(([section, data]) => (
-        <div key={section}>
-          <h4>{section}</h4>
-          <pre>{JSON.stringify(data, null, 2)}</pre>
+        <div key={section} className="mb-4">
+          <h4 className="text-secondary mb-2" style={{ textTransform: 'uppercase', fontSize: '0.8rem' }}>{section}</h4>
+          <pre className="log-box" style={{ background: 'var(--bg-card)', border: 'none' }}>{JSON.stringify(data, null, 2)}</pre>
         </div>
       ))}
     </div>
   );
 };
 
-RenderDiff.propTypes = {
-  diff: PropTypes.object,
-};
-
-RenderDiff.defaultProps = {
-  diff: null,
-};
+RenderDiff.propTypes = { diff: PropTypes.object };
 
 const RenderPlugins = ({ plugins }) => {
-  if (!plugins) return <p>No plugin output.</p>;
+  if (!plugins) return <p className="text-muted">No plugin output available.</p>;
   return (
-    <div className="diff-block">
+    <div>
       {Object.entries(plugins).map(([name, payload]) => (
-        <div key={name}>
-          <h4>{name}</h4>
-          <pre>{JSON.stringify(payload, null, 2)}</pre>
+        <div key={name} className="mb-4">
+          <h4 className="text-secondary mb-2" style={{ textTransform: 'uppercase', fontSize: '0.8rem' }}>{name}</h4>
+          <pre className="log-box">{JSON.stringify(payload, null, 2)}</pre>
         </div>
       ))}
     </div>
   );
 };
 
-RenderPlugins.propTypes = {
-  plugins: PropTypes.object,
-};
+RenderPlugins.propTypes = { plugins: PropTypes.object };
 
-RenderPlugins.defaultProps = {
-  plugins: null,
-};
+// --- Helpers & Maps ---
 
 const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
 const riskBadgeMap = {
@@ -85,11 +70,7 @@ const statusBadgeMap = {
 
 const formatTimestamp = (value) => {
   if (!value) return "-";
-  try {
-    return new Date(value).toLocaleString();
-  } catch (err) {
-    return value;
-  }
+  try { return new Date(value).toLocaleString(); } catch (err) { return value; }
 };
 
 const extractCommandKey = (command) => {
@@ -97,98 +78,62 @@ const extractCommandKey = (command) => {
   return command.trim().split(/\s+/)[0];
 };
 
+// --- Intel Component ---
+
 const RenderServiceIntel = ({ intel }) => {
   const findings = intel?.findings || [];
   const metrics = intel?.metrics || {};
-  const riskCounts = metrics.by_risk || {};
 
   if (findings.length === 0) {
-    return <p className="muted">No service intelligence findings were recorded.</p>;
+    return (
+      <div className="flex-row" style={{ height: '200px', justifyContent: 'center', color: 'var(--text-muted)' }}>
+        <p>No service intelligence findings recorded.</p>
+      </div>
+    );
   }
-
-  const riskSummary = Object.keys(riskCounts).sort(
-    (a, b) => (severityOrder[b] || 0) - (severityOrder[a] || 0),
-  );
 
   return (
     <div className="service-intel">
-      <div className="service-intel-summary">
-        <div className="intel-metric">
-          <span className="metric-label">Findings</span>
-          <span className="metric-value">{metrics.total_findings || findings.length}</span>
+      <div className="dashboard-grid mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+        <div className="stat-card">
+          <span className="stat-label">Findings</span>
+          <span className="stat-value">{metrics.total_findings || findings.length}</span>
         </div>
-        <div className="intel-metric">
-          <span className="metric-label">Affected Targets</span>
-          <span className="metric-value">{metrics.affected_targets || "-"}</span>
-        </div>
-        <div className="intel-metric risk-breakdown">
-          <span className="metric-label">Risk Breakdown</span>
-          <div className="risk-pills">
-            {riskSummary.length === 0 && <span className="badge badge-muted">n/a</span>}
-            {riskSummary.map((key) => (
-              <span key={key} className={`badge ${riskBadgeMap[key] || "badge-muted"}`}>
-                {key}: {riskCounts[key]}
-              </span>
-            ))}
-          </div>
+        <div className="stat-card">
+          <span className="stat-label">Targets</span>
+          <span className="stat-value">{metrics.affected_targets || "-"}</span>
         </div>
       </div>
+
       <div className="intel-cards">
         {findings.map((finding, index) => {
           const risk = (finding.risk || "").toLowerCase();
           const badge = riskBadgeMap[risk] || "badge-muted";
           const header = `${finding.protocol || ""}/${finding.port || "?"}`;
           return (
-            <article key={`${finding.service || "service"}-${index}`} className="intel-card">
-              <header>
+            <article key={`${finding.service || "service"}-${index}`} className="panel" style={{ padding: '16px', background: 'var(--bg-card)' }}>
+              <header className="flex-row space-between mb-4">
                 <div>
-                  <h4>{finding.summary || finding.service || "Service"}</h4>
-                  <span className="intel-location">{header}</span>
+                  <h4 style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{finding.summary || finding.service || "Service"}</h4>
+                  <span className="text-muted text-mono" style={{ fontSize: '0.8rem' }}>{header}</span>
                 </div>
                 <span className={`badge ${badge}`}>{finding.risk || "info"}</span>
               </header>
-              {finding.observations && finding.observations.length > 0 && (
-                <div className="intel-section">
-                  <span className="intel-section-title">Observations</span>
-                  <ul>
-                    {finding.observations.map((obs, obsIndex) => (
-                      <li key={`obs-${obsIndex}`}>{obs}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {finding.recommendations && finding.recommendations.length > 0 && (
-                <div className="intel-section">
-                  <span className="intel-section-title">Recommendations</span>
-                  <ul>
-                    {finding.recommendations.map((rec, recIndex) => (
-                      <li key={`rec-${recIndex}`}>{rec}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {finding.references && finding.references.length > 0 && (
-                <div className="intel-section intel-references">
-                  <span className="intel-section-title">References</span>
-                  <ul>
-                    {finding.references.map((ref, refIndex) => (
-                      <li key={`ref-${refIndex}`}>
-                        {ref.startsWith("http") ? (
-                          <a href={ref} target="_blank" rel="noreferrer">
-                            {ref}
-                          </a>
-                        ) : (
-                          ref
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+
               {finding.banner && (
-                <div className="intel-section">
-                  <span className="intel-section-title">Banner</span>
-                  <code className="intel-banner">{finding.banner}</code>
+                <div className="mb-4">
+                  <div className="log-box" style={{ padding: '8px', fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                    {finding.banner}
+                  </div>
+                </div>
+              )}
+
+              {finding.recommendations && finding.recommendations.length > 0 && (
+                <div>
+                  <h5 className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>Recommendations</h5>
+                  <ul className="text-muted" style={{ paddingLeft: '20px', fontSize: '0.85rem' }}>
+                    {finding.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
+                  </ul>
                 </div>
               )}
             </article>
@@ -199,16 +144,9 @@ const RenderServiceIntel = ({ intel }) => {
   );
 };
 
-RenderServiceIntel.propTypes = {
-  intel: PropTypes.shape({
-    findings: PropTypes.arrayOf(PropTypes.object),
-    metrics: PropTypes.object,
-  }),
-};
+RenderServiceIntel.propTypes = { intel: PropTypes.object };
 
-RenderServiceIntel.defaultProps = {
-  intel: null,
-};
+// --- Deep Dive Component ---
 
 const DeepDiveSection = ({
   scan,
@@ -217,23 +155,26 @@ const DeepDiveSection = ({
   onRunDeepDive,
   onRefreshDeepDive,
   onFetchDeepDiveOutput,
+  onUploadScript,
   busy,
 }) => {
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadName, setUploadName] = useState("");
+  const [uploadContent, setUploadContent] = useState("");
+  const [notice, setNotice] = useState("");
   const [expanded, setExpanded] = useState({});
   const [loadingMap, setLoadingMap] = useState({});
-  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     setExpanded({});
     setLoadingMap({});
     setNotice("");
+    setShowUpload(false);
+    setUploadName("");
+    setUploadContent("");
   }, [scan?.job_id]);
 
-  const deepDiveTasks = useMemo(() => {
-    const plugin = scan?.plugins?.["deep-dive"];
-    if (!plugin) return [];
-    return Array.isArray(plugin.tasks) ? plugin.tasks : [];
-  }, [scan?.plugins]);
+  const deepDiveTasks = useMemo(() => scan?.plugins?.["deep-dive"]?.tasks || [], [scan?.plugins]);
 
   const allowlistEntries = useMemo(() => {
     if (!allowlist || !Array.isArray(allowlist.entries)) return [];
@@ -246,39 +187,22 @@ const DeepDiveSection = ({
   const allCommands = useMemo(() => {
     const collected = [];
     deepDiveTasks.forEach((task) => {
-      (task.commands || []).forEach((command) => {
-        if (command) {
-          collected.push(command);
-        }
-      });
+      (task.commands || []).forEach((cmd) => cmd && collected.push(cmd));
     });
     return Array.from(new Set(collected));
   }, [deepDiveTasks]);
 
   const commandsByAllowance = useMemo(() => {
-    if (!enforcementEnabled || allowlistSet.size === 0) {
-      return { allowed: allCommands, blocked: [] };
-    }
-    const allowedList = [];
-    const blockedList = [];
-    allCommands.forEach((command) => {
-      const key = extractCommandKey(command);
-      if (allowlistSet.has(key)) {
-        allowedList.push(command);
-      } else {
-        blockedList.push(command);
-      }
+    if (!enforcementEnabled || allowlistSet.size === 0) return { allowed: allCommands, blocked: [] };
+    const allowed = [], blocked = [];
+    allCommands.forEach(cmd => {
+      (allowlistSet.has(extractCommandKey(cmd)) ? allowed : blocked).push(cmd);
     });
-    return { allowed: allowedList, blocked: blockedList };
+    return { allowed, blocked };
   }, [allCommands, allowlistSet, enforcementEnabled]);
 
   const sortedTasks = useMemo(() => {
-    const list = Array.isArray(tasks) ? tasks : [];
-    return [...list].sort((a, b) => {
-      const timeA = a?.created_at ? new Date(a.created_at).getTime() : 0;
-      const timeB = b?.created_at ? new Date(b.created_at).getTime() : 0;
-      return timeB - timeA;
-    });
+    return [...(tasks || [])].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   }, [tasks]);
 
   const hasCommands = deepDiveTasks.length > 0;
@@ -305,396 +229,333 @@ const DeepDiveSection = ({
     onRunDeepDive(scan.job_id, [command]);
   };
 
-  const handleRefresh = () => {
-    if (!scan?.job_id || !onRefreshDeepDive) return;
-    onRefreshDeepDive(scan.job_id);
-  };
-
   const handleToggleTask = async (task) => {
     if (!task) return;
     const isOpen = !!expanded[task.id];
     if (!isOpen && onFetchDeepDiveOutput && !task.stdout && !task.stderr) {
       setLoadingMap((prev) => ({ ...prev, [task.id]: true }));
-      try {
-        await onFetchDeepDiveOutput(task.id);
-      } catch (err) {
-        // Error surfaced via parent; keep UI responsive.
-      } finally {
-        setLoadingMap((prev) => {
-          const next = { ...prev };
-          delete next[task.id];
-          return next;
-        });
-      }
+      try { await onFetchDeepDiveOutput(task.id); }
+      catch (err) { /* ignore */ }
+      finally { setLoadingMap((prev) => { const n = { ...prev }; delete n[task.id]; return n; }); }
     }
     setExpanded((prev) => ({ ...prev, [task.id]: !isOpen }));
   };
 
+  const handleUploadSubmit = (e) => {
+    e.preventDefault();
+    if (onUploadScript) {
+      onUploadScript(uploadName, uploadContent);
+      setShowUpload(false);
+      setUploadName("");
+      setUploadContent("");
+    }
+  };
+
   return (
-    <section className="deep-dive-section">
-      <div className="deep-dive-header">
-        <h3>Deep-Dive Follow-ups</h3>
-        <div className="deep-dive-actions">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={handleRefresh}
-            disabled={!scan?.job_id || busy}
-          >
-            Refresh Tasks
+    <div className="deep-dive-section">
+      <div className="flex-row space-between mb-4">
+        <div></div>
+        <div className="flex-row">
+          {onUploadScript && (
+            <button className="btn btn-secondary" disabled={busy} onClick={() => setShowUpload(!showUpload)}>
+              {showUpload ? "Cancel" : "Upload Script"}
+            </button>
+          )}
+          <button className="btn btn-secondary" disabled={!scan?.job_id || busy} onClick={() => onRefreshDeepDive && onRefreshDeepDive(scan.job_id)}>
+            Refresh
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleRunAll}
-            disabled={!hasCommands || busy}
-          >
-            Run All
+          <button className="btn btn-primary" disabled={!hasCommands || busy} onClick={handleRunAll}>
+            Run All Suggested
           </button>
         </div>
       </div>
-      {notice && <div className="alert alert-info deep-dive-notice">{notice}</div>}
-      {enforcementEnabled && (
-        <div className="deep-dive-allowlist">
-          <span className="muted">Allowlisted commands:</span>
-          {allowlistEntries.length === 0 ? (
-            <span className="badge badge-info">All commands</span>
-          ) : (
-            <div className="chip-group">
-              {allowlistEntries.map((entry) => (
-                <span key={entry} className="chip">
-                  {entry}
-                </span>
-              ))}
+
+      {showUpload && (
+        <div className="panel mb-4" style={{ background: 'var(--bg-card)', padding: '16px' }}>
+          <form onSubmit={handleUploadSubmit}>
+            <h4 className="mb-4">Upload Custom Script</h4>
+            <div className="form-group">
+              <label>Script Name (e.g. audit.sh)</label>
+              <input type="text" required value={uploadName} onChange={e => setUploadName(e.target.value)} />
             </div>
-          )}
+            <div className="form-group">
+              <label>Content</label>
+              <textarea rows={6} required value={uploadContent} onChange={e => setUploadContent(e.target.value)} className="text-mono" />
+            </div>
+            <div className="flex-row" style={{ justifyContent: 'flex-end' }}>
+              <button type="submit" className="btn btn-primary">Upload</button>
+            </div>
+          </form>
         </div>
       )}
-      {!hasCommands ? (
-        <p className="muted">No deep-dive commands were suggested for this scan.</p>
-      ) : (
-        <div className="deep-dive-commands">
+
+      {notice && <div className="alert alert-info">{notice}</div>}
+
+      {/* Suggested Commands Grid */}
+      {hasCommands ? (
+        <div className="dashboard-grid mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
           {deepDiveTasks.map((task, index) => {
-            const { target, service, port, protocol } = task;
-            const titleParts = [service || "service", port && protocol ? `${port}/${protocol}` : port, target];
+            const titleParts = [task.service || "service", task.port || "", task.target].filter(Boolean).join(" • ");
             return (
-              <article key={`${service || "task"}-${port || index}`} className="deep-dive-card">
-                <header>
-                  <h4>{titleParts.filter(Boolean).join(" • ")}</h4>
-                  {task.credentials && <span className="badge badge-info">Credentials loaded</span>}
-                </header>
-                <ul className="command-list">
-                  {(task.commands || []).map((command, cmdIndex) => {
-                    const key = extractCommandKey(command);
+              <div key={`${task.service}-${index}`} className="panel" style={{ padding: '12px', background: 'var(--bg-card)' }}>
+                <div className="flex-row space-between mb-2">
+                  <h5 className="text-primary">{titleParts}</h5>
+                  {task.credentials && <span className="badge badge-info">Creds</span>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(task.commands || []).map((cmd, i) => {
+                    const key = extractCommandKey(cmd);
                     const blocked = enforcementEnabled && allowlistSet.size > 0 && !allowlistSet.has(key);
                     return (
-                      <li key={`${command}-${cmdIndex}`}>
-                        <code className="command-text">{command}</code>
-                        {blocked && (
-                          <span className="badge badge-error" title="This command is blocked by the allowlist">
-                            Blocked
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => handleRunCommand(command)}
-                          disabled={busy || blocked}
-                        >
-                          Run
-                        </button>
-                      </li>
-                    );
+                      <div key={i} className="flex-row input-group">
+                        <input type="text" readOnly value={cmd} className="text-mono" style={{ fontSize: '0.75rem', background: 'rgba(0,0,0,0.3)', border: 'none' }} />
+                        <button className="btn btn-secondary" style={{ padding: '4px 8px' }} disabled={busy || blocked} onClick={() => handleRunCommand(cmd)}>Run</button>
+                      </div>
+                    )
                   })}
-                </ul>
-              </article>
-            );
+                </div>
+              </div>
+            )
           })}
         </div>
+      ) : (
+        <p className="text-muted mb-4">No automated deep-dive suggestions available.</p>
       )}
-      {enforcementEnabled && commandsByAllowance.blocked.length > 0 && (
-        <p className="muted blocked-note">
-          {commandsByAllowance.blocked.length} command
-          {commandsByAllowance.blocked.length > 1 ? "s are" : " is"} blocked by the current allowlist.
-        </p>
-      )}
-      <div className="deep-dive-tasks">
-        <div className="deep-dive-header">
-          <h4>Execution Queue</h4>
+
+      {/* Execution Log */}
+      <div className="panel">
+        <div className="panel-header">
+          <h2>Execution Log</h2>
         </div>
-        {sortedTasks.length === 0 ? (
-          <p className="muted">No deep-dive commands have been queued yet.</p>
-        ) : (
-          <table className="task-table">
-            <thead>
-              <tr>
-                <th>Command</th>
-                <th>Status</th>
-                <th>Return Code</th>
-                <th>Created</th>
-                <th>Updated</th>
-                <th>Output</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTasks.map((task) => {
-                const badgeKey = (task.status || "").toLowerCase();
-                const badge = statusBadgeMap[badgeKey] || {
-                  label: task.status || "unknown",
-                  className: "badge-muted",
-                };
-                return (
-                  <Fragment key={task.id}>
-                    <tr>
-                      <td>
-                        <code className="command-text">{task.command}</code>
-                      </td>
-                      <td>
-                        <span className={`badge ${badge.className}`}>{badge.label}</span>
-                      </td>
-                      <td>{task.return_code === null || task.return_code === undefined ? "—" : task.return_code}</td>
-                      <td>{formatTimestamp(task.created_at)}</td>
-                      <td>{formatTimestamp(task.updated_at)}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => handleToggleTask(task)}
-                        >
-                          {expanded[task.id] ? "Hide" : "View"}
-                        </button>
-                      </td>
-                    </tr>
-                    {expanded[task.id] && (
-                      <tr className="task-output-row">
-                        <td colSpan={6}>
-                          {loadingMap[task.id] ? (
-                            <p className="muted">Loading task output…</p>
-                          ) : (
-                            <div className="task-output">
-                              <div>
-                                <h5>Stdout</h5>
-                                <pre className="log-box">{task.stdout || "(empty)"}</pre>
-                              </div>
-                              <div>
-                                <h5>Stderr</h5>
-                                <pre className="log-box">{task.stderr || "(empty)"}</pre>
-                              </div>
-                            </div>
-                          )}
+        <div className="panel-body" style={{ padding: 0 }}>
+          {sortedTasks.length === 0 ? (
+            <div style={{ padding: '16px' }} className="text-muted">No tasks executed yet.</div>
+          ) : (
+            <table style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th>Command</th>
+                  <th>Status</th>
+                  <th>Result</th>
+                  <th>Time</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedTasks.map(task => {
+                  const badgeVal = statusBadgeMap[(task.status || '').toLowerCase()] || { label: task.status, className: "badge-muted" };
+                  return (
+                    <Fragment key={task.id}>
+                      <tr>
+                        <td><code style={{ fontSize: '0.75rem' }}>{task.command}</code></td>
+                        <td><span className={`badge ${badgeVal.className}`}>{badgeVal.label}</span></td>
+                        <td>{task.return_code ?? "—"}</td>
+                        <td>{formatTimestamp(task.created_at)}</td>
+                        <td>
+                          <button className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '0.7rem' }} onClick={() => handleToggleTask(task)}>
+                            {expanded[task.id] ? "Hide" : "View"}
+                          </button>
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+                      {expanded[task.id] && (
+                        <tr>
+                          <td colSpan={5} style={{ padding: '0', background: '#000' }}>
+                            {loadingMap[task.id] ? (
+                              <div style={{ padding: '12px' }} className="text-muted">Loading...</div>
+                            ) : (
+                              <div style={{ padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div><h6 className="text-muted mb-2">STDOUT</h6><pre className="log-box" style={{ border: 'none' }}>{task.stdout || ""}</pre></div>
+                                <div><h6 className="text-muted mb-2">STDERR</h6><pre className="log-box" style={{ border: 'none' }}>{task.stderr || ""}</pre></div>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
-    </section>
+    </div>
   );
 };
+DeepDiveSection.propTypes = { scan: PropTypes.object, tasks: PropTypes.array, allowlist: PropTypes.object, onRunDeepDive: PropTypes.func, onRefreshDeepDive: PropTypes.func, onFetchDeepDiveOutput: PropTypes.func, onUploadScript: PropTypes.func, busy: PropTypes.bool };
 
-DeepDiveSection.propTypes = {
-  scan: PropTypes.shape({
-    job_id: PropTypes.string,
-    plugins: PropTypes.object,
-  }),
-  tasks: PropTypes.arrayOf(PropTypes.object),
-  allowlist: PropTypes.shape({
-    entries: PropTypes.arrayOf(PropTypes.string),
-    enforced: PropTypes.bool,
-  }),
-  onRunDeepDive: PropTypes.func,
-  onRefreshDeepDive: PropTypes.func,
-  onFetchDeepDiveOutput: PropTypes.func,
-  busy: PropTypes.bool,
-};
 
-DeepDiveSection.defaultProps = {
-  scan: null,
-  tasks: [],
-  allowlist: { entries: [], enforced: true },
-  onRunDeepDive: () => {},
-  onRefreshDeepDive: () => {},
-  onFetchDeepDiveOutput: () => {},
-  busy: false,
-};
+// --- Vulns Component ---
 
 const RenderVulnerabilities = ({ vulnerabilities }) => {
-  if (!vulnerabilities || vulnerabilities.length === 0) {
-    return <p>No exploitable or vulnerable findings recorded.</p>;
-  }
+  if (!vulnerabilities?.length) return <p className="text-muted">No vulnerabilities detected.</p>;
 
   const sorted = [...vulnerabilities].sort((a, b) => {
-    const sevA = severityOrder[(a.severity || "").toLowerCase()] || 0;
-    const sevB = severityOrder[(b.severity || "").toLowerCase()] || 0;
-    return sevB - sevA;
+    return (severityOrder[(b.severity || '').toLowerCase()] || 0) - (severityOrder[(a.severity || '').toLowerCase()] || 0);
   });
-
-  const formatSeverity = (severity) => {
-    if (!severity) return { label: "info", className: "badge-muted" };
-    const key = severity.toLowerCase();
-    if (key in severityOrder) {
-      return { label: severity, className: `badge-severity-${key}` };
-    }
-    return { label: severity, className: "badge-info" };
-  };
 
   return (
     <table className="vuln-table">
       <thead>
         <tr>
           <th>Title</th>
-          <th>Target</th>
-          <th>Location</th>
           <th>Severity</th>
-          <th>Source</th>
+          <th>Location</th>
           <th>CVEs</th>
         </tr>
       </thead>
       <tbody>
-        {sorted.map((item, index) => {
-          const severity = formatSeverity(item.severity);
-          const location = item.port ? `${item.port}${item.protocol ? '/' + item.protocol : ''}` : item.scope || 'Host';
-          const cves = Array.isArray(item.cves) ? item.cves.join(", ") : "";
+        {sorted.map((item, i) => {
+          const sevKey = (item.severity || '').toLowerCase();
+          const badgeClass = riskBadgeMap[sevKey] || 'badge-info';
           return (
-            <tr key={`${item.title || item.script_id || index}-${index}`}>
-              <td>{item.title || item.script_id || "(unnamed finding)"}</td>
-              <td>{item.target || "-"}</td>
-              <td>{location || "-"}</td>
-              <td>
-                <span className={`badge ${severity.className}`}>{severity.label}</span>
-              </td>
-              <td>{item.source || "nmap"}</td>
-              <td>{cves || "-"}</td>
+            <tr key={i}>
+              <td style={{ fontWeight: 500 }}>{item.title || item.script_id}</td>
+              <td><span className={`badge ${badgeClass}`}>{item.severity || 'Info'}</span></td>
+              <td className="text-mono text-muted">{item.port ? `${item.port}/${item.protocol || ''}` : item.scope}</td>
+              <td className="text-mono">{Array.isArray(item.cves) ? item.cves.join(", ") : ""}</td>
             </tr>
-          );
+          )
         })}
       </tbody>
     </table>
   );
 };
+RenderVulnerabilities.propTypes = { vulnerabilities: PropTypes.array };
 
-RenderVulnerabilities.propTypes = {
-  vulnerabilities: PropTypes.arrayOf(PropTypes.object),
-};
+// --- Main ScanDetail Component ---
 
-RenderVulnerabilities.defaultProps = {
-  vulnerabilities: [],
-};
+function ScanDetail(props) {
+  const { scan } = props;
+  const [activeTab, setActiveTab] = useState("overview");
+  const [isExpanded, setIsExpanded] = useState(false);
 
-function ScanDetail({
-  scan,
-  deepDiveTasks,
-  deepDiveBusy,
-  deepDiveAllowlist,
-  onRunDeepDive,
-  onRefreshDeepDive,
-  onFetchDeepDiveOutput,
-}) {
+  // Reset tab when scan changes
+  useEffect(() => { setActiveTab("overview"); }, [scan?.job_id]);
+
   if (!scan) {
     return (
-      <div className="panel">
+      <div className="panel scan-detail-panel">
         <div className="panel-header">
           <h2>Scan Details</h2>
         </div>
-        <div className="panel-body">
-          <p>Select a job to inspect its summary, diff, and plugin output.</p>
+        <div className="panel-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: 'var(--text-secondary)' }}>
+          <p>Select a scan job to inspect details.</p>
         </div>
       </div>
     );
   }
+
+  const jobLabel = scan.job_id.substring(0, 8);
+  const statusBadge = (statusBadgeMap[scan.status] || {}).className || "badge-muted";
+
   return (
-    <div className="panel">
+    <div className={`panel scan-detail-panel ${isExpanded ? 'panel-fullscreen' : ''}`}>
       <div className="panel-header">
-        <h2>Scan Details</h2>
-        <div className="chip-group">
-          <span className="chip">Job: {scan.job_id}</span>
-          <span className="chip">Status: {scan.status}</span>
+        <div className="flex-row">
+          <h2 style={{ marginRight: '16px' }}>Details</h2>
+          <span className="text-mono text-muted" style={{ fontSize: '0.85rem' }}>#{jobLabel}</span>
+          <span className={`badge ${statusBadge}`} style={{ marginLeft: '8px' }}>{scan.status}</span>
+        </div>
+        <div className="flex-row">
+          <button className="btn-icon" onClick={() => props.onDeleteScan && props.onDeleteScan(scan.job_id)} title="Delete Scan" style={{ marginRight: '8px', color: '#ef4444' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+          </button>
+          <button className="btn-icon" onClick={() => setIsExpanded(!isExpanded)} title={isExpanded ? "Collapse" : "Expand"}>
+            {isExpanded ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" /></svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+            )}
+          </button>
         </div>
       </div>
+
+      <nav className="tabs-nav">
+        <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>Overview</button>
+        <button className={`tab-btn ${activeTab === 'network' ? 'active' : ''}`} onClick={() => setActiveTab('network')}>Network Intel</button>
+        <button className={`tab-btn ${activeTab === 'topology' ? 'active' : ''}`} onClick={() => setActiveTab('topology')}>Topology</button>
+        <button className={`tab-btn ${activeTab === 'vulnerabilities' ? 'active' : ''}`} onClick={() => setActiveTab('vulnerabilities')}>Vulnerabilities</button>
+        <button className={`tab-btn ${activeTab === 'terminal' ? 'active' : ''}`} onClick={() => setActiveTab('terminal')}>Terminal / Deep Dive</button>
+        <button className={`tab-btn ${activeTab === 'logs' ? 'active' : ''}`} onClick={() => setActiveTab('logs')}>Raw Logs</button>
+      </nav>
+
       <div className="panel-body">
-        <section>
-          <h3>Service Intelligence</h3>
-          <RenderServiceIntel intel={scan.plugins?.["service-intel"]} />
-        </section>
-        <DeepDiveSection
-          scan={scan}
-          tasks={deepDiveTasks}
-          allowlist={deepDiveAllowlist}
-          onRunDeepDive={onRunDeepDive}
-          onRefreshDeepDive={onRefreshDeepDive}
-          onFetchDeepDiveOutput={onFetchDeepDiveOutput}
-          busy={deepDiveBusy}
-        />
-        <section>
-          <h3>Vulnerabilities &amp; Exposures</h3>
+        {activeTab === 'overview' && (
+          <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <h3 className="mb-4">Summary</h3>
+              <RenderSummary summary={scan.summary} />
+            </div>
+            <div>
+              <h3 className="mb-4">Artifacts & Changes</h3>
+              <RenderDiff diff={scan.diff} />
+              <div className="mt-4">
+                <h4 className="text-secondary mb-2" style={{ fontSize: '0.8rem' }}>ARTIFACTS</h4>
+                {Object.keys(scan.artifacts || {}).length === 0 ? <p className="text-muted">None</p> : (
+                  <ul className="text-mono text-sm pl-4">
+                    {Object.keys(scan.artifacts).map(k => <li key={k}>{k}</li>)}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'network' && (
+          <RenderServiceIntel intel={scan.plugins?.['service-intel']} />
+        )}
+
+        {activeTab === 'topology' && (
+          <div style={{ height: '100%', minHeight: '500px' }}>
+            <NetworkGraph scan={scan} />
+          </div>
+        )}
+
+        {activeTab === 'vulnerabilities' && (
           <RenderVulnerabilities vulnerabilities={scan.vulnerabilities} />
-        </section>
-        <section>
-          <h3>Summary</h3>
-          <RenderSummary summary={scan.summary} />
-        </section>
-        <section>
-          <h3>Diff</h3>
-          <RenderDiff diff={scan.diff} />
-        </section>
-        <section>
-          <h3>Plugin Output</h3>
-          <RenderPlugins plugins={scan.plugins} />
-        </section>
-        <section>
-          <h3>Artifacts</h3>
-          {Object.keys(scan.artifacts || {}).length === 0 ? (
-            <p>No artifacts captured yet.</p>
-          ) : (
-            <ul>
-              {Object.entries(scan.artifacts).map(([key]) => (
-                <li key={key}>{key}</li>
-              ))}
-            </ul>
-          )}
-        </section>
-        <section>
-          <h3>Logs</h3>
-          <pre className="log-box">{scan.logs || "(empty)"}</pre>
-        </section>
+        )}
+
+        {activeTab === 'terminal' && (
+          <DeepDiveSection
+            scan={scan}
+            tasks={props.deepDiveTasks}
+            allowlist={props.deepDiveAllowlist}
+            busy={props.deepDiveBusy}
+            onRunDeepDive={props.onRunDeepDive}
+            onRefreshDeepDive={props.onRefreshDeepDive}
+            onFetchDeepDiveOutput={props.onFetchDeepDiveOutput}
+            onUploadScript={props.onUploadScript}
+          />
+        )}
+
+        {activeTab === 'logs' && (
+          <div>
+            <div className="mb-4">
+              <h3>Standard Output</h3>
+              <pre className="log-box">{scan.logs || "(empty)"}</pre>
+            </div>
+            <div className="mb-4">
+              <h3>Plugin Raw Data</h3>
+              <RenderPlugins plugins={scan.plugins} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 ScanDetail.propTypes = {
-  scan: PropTypes.shape({
-    job_id: PropTypes.string,
-    status: PropTypes.string,
-    summary: PropTypes.object,
-    diff: PropTypes.object,
-    plugins: PropTypes.object,
-    artifacts: PropTypes.object,
-    logs: PropTypes.string,
-  }),
-  deepDiveTasks: PropTypes.arrayOf(PropTypes.object),
+  scan: PropTypes.object,
+  deepDiveTasks: PropTypes.array,
+  deepDiveAllowlist: PropTypes.object,
   deepDiveBusy: PropTypes.bool,
-  deepDiveAllowlist: PropTypes.shape({
-    entries: PropTypes.arrayOf(PropTypes.string),
-    enforced: PropTypes.bool,
-  }),
   onRunDeepDive: PropTypes.func,
   onRefreshDeepDive: PropTypes.func,
   onFetchDeepDiveOutput: PropTypes.func,
-};
-
-ScanDetail.defaultProps = {
-  scan: null,
-  deepDiveTasks: [],
-  deepDiveBusy: false,
-  deepDiveAllowlist: { entries: [], enforced: true },
-  onRunDeepDive: () => {},
-  onRefreshDeepDive: () => {},
-  onFetchDeepDiveOutput: () => {},
+  onUploadScript: PropTypes.func,
+  onDeleteScan: PropTypes.func,
 };
 
 export default ScanDetail;

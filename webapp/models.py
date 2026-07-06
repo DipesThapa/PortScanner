@@ -1,13 +1,52 @@
 from __future__ import annotations
 
+import re
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import json
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlmodel import Field as SQLField, SQLModel
+
+# A scan target must be a hostname, IPv4/IPv6 address, or CIDR range. This
+# deliberately excludes whitespace, shell metacharacters, and a leading '-'
+# (which nmap would otherwise interpret as a flag → argument injection).
+_TARGET_RE = re.compile(r"^(?!-)[A-Za-z0-9._:/-]{1,255}$")
+_PORTS_RE = re.compile(r"^[0-9,\-]{1,128}$")
+
+# Nmap flags that let an attacker read/write arbitrary files or execute code.
+# Refused inside extra_args, scripts, and target values.
+_DANGEROUS_ARG_PREFIXES = (
+    "--script",       # arbitrary NSE / Lua execution
+    "--datadir",      # load NSE from an attacker-controlled directory
+    "--servicedb",
+    "--stylesheet",
+    "-oN", "-oG", "-oS", "-oA", "-oX",  # write files to arbitrary paths
+    "--resume",
+    "--iflist",
+)
+
+
+def _validate_target(value: str) -> str:
+    value = value.strip()
+    if not value:
+        raise ValueError("Target must not be empty.")
+    if value.startswith("-"):
+        raise ValueError(f"Invalid target (looks like a flag): {value!r}")
+    if not _TARGET_RE.match(value):
+        raise ValueError(f"Invalid target: {value!r}")
+    return value
+
+
+def _reject_dangerous_arg(value: str) -> str:
+    stripped = value.strip()
+    lowered = stripped.lower()
+    for prefix in _DANGEROUS_ARG_PREFIXES:
+        if lowered == prefix.lower() or lowered.startswith(prefix.lower() + "="):
+            raise ValueError(f"Disallowed nmap argument: {value!r}")
+    return value
 
 
 class ScanRequest(BaseModel):
@@ -40,6 +79,76 @@ class ScanRequest(BaseModel):
     orchestrator_config: Optional[str] = None
     api_listen: Optional[str] = None
     job_name: Optional[str] = None
+
+    @field_validator("target")
+    @classmethod
+    def _check_target(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_target(v) if v is not None else v
+
+    @field_validator("targets")
+    @classmethod
+    def _check_targets(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        return [_validate_target(t) for t in v] if v else v
+
+    @field_validator("ports")
+    @classmethod
+    def _check_ports(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if not _PORTS_RE.match(v):
+            raise ValueError(f"Invalid ports specification: {v!r}")
+        return v
+
+    @field_validator("start_port", "end_port")
+    @classmethod
+    def _check_port_number(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and not (0 <= v <= 65535):
+            raise ValueError("Port must be between 0 and 65535.")
+        return v
+
+    @field_validator("timing")
+    @classmethod
+    def _check_timing(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and not (0 <= v <= 5):
+            raise ValueError("Nmap timing template must be between 0 and 5.")
+        return v
+
+    @field_validator("concurrency")
+    @classmethod
+    def _check_concurrency(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and not (1 <= v <= 64):
+            raise ValueError("Concurrency must be between 1 and 64.")
+        return v
+
+    @field_validator("extra_args")
+    @classmethod
+    def _check_extra_args(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        return [_reject_dangerous_arg(a) for a in v] if v else v
+
+    @field_validator("scripts", "intel_scripts")
+    @classmethod
+    def _check_scripts(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if not v:
+            return v
+        for name in v:
+            # NSE script names/categories only — no paths, flags, or metacharacters.
+            if not re.match(r"^[A-Za-z0-9._+-]{1,64}$", name.strip()):
+                raise ValueError(f"Invalid script name: {name!r}")
+        return v
+
+    @classmethod
+    def from_stored(cls, raw_json: str) -> "ScanRequest":
+        """Load a previously persisted request WITHOUT re-running input validators.
+
+        Validation exists to gate *inbound* requests. Records already written to
+        the database were validated (or predate validation) and must still load,
+        so we reconstruct them without validation.
+        """
+        try:
+            return cls.model_validate_json(raw_json)
+        except Exception:
+            return cls.model_construct(**json.loads(raw_json))
 
 
 class ScanResponse(BaseModel):
@@ -97,15 +206,15 @@ class ScheduleResponse(BaseModel):
             id=record.id,
             name=record.name,
             created_at=record.created_at,
-            request=ScanRequest.model_validate_json(record.request_json),
+            request=ScanRequest.from_stored(record.request_json),
         )
 
 
-class WorkerStatusRecord(SQLModel, table=True):
+class WorkerNodeRecord(SQLModel, table=True):
     id: str = SQLField(primary_key=True, index=True)
     name: str
     address: str
-    reachable: bool
+    reachable: bool = False
     last_checked: datetime = SQLField(default_factory=datetime.utcnow)
     capabilities_json: Optional[str] = None
 
@@ -118,7 +227,7 @@ class WorkerStatus(BaseModel):
     capabilities: Dict[str, str] = Field(default_factory=dict)
 
     @classmethod
-    def from_record(cls, record: WorkerStatusRecord) -> "WorkerStatus":
+    def from_record(cls, record: WorkerNodeRecord) -> "WorkerStatus":
         return cls(
             name=record.name,
             address=record.address,

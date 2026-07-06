@@ -24,7 +24,14 @@ class DeepDiveExecutor:
     ) -> None:
         self.base_dir = base_dir
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        self.allowlist = self._load_allowlist(allowlist)
+        # Remember the operator-supplied allowlist so reloads stay deterministic.
+        self._initial_allowlist = list(allowlist) if allowlist else None
+        self.allowlist = self._load_allowlist(self._initial_allowlist)
+
+    def reload_allowlist(self) -> Optional[Set[str]]:
+        """Recompute the allowlist, preserving the operator-supplied entries."""
+        self.allowlist = self._load_allowlist(self._initial_allowlist)
+        return self.allowlist
 
     def _task_dir(self, job_id: uuid.UUID, task_id: uuid.UUID) -> Path:
         task_dir = job_directory(self.base_dir, job_id) / "deepdive" / str(task_id)
@@ -120,6 +127,23 @@ class DeepDiveExecutor:
         entries = sorted(self.allowlist) if self.allowlist else []
         return {"entries": entries, "enforced": enforced}
 
+    async def save_script(self, name: str, content: str) -> str:
+        scripts_dir = self.base_dir / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        # Sanitize name
+        safe_name = Path(name).name
+        script_path = scripts_dir / safe_name
+        
+        # Write content
+        # Ensure executable
+        await asyncio.to_thread(self._write_script, script_path, content)
+        return str(script_path)
+
+    def _write_script(self, path: Path, content: str) -> None:
+        path.write_text(content, encoding="utf-8")
+        st = os.stat(path)
+        os.chmod(path, st.st_mode | 0o111)
+
     def _load_allowlist(self, initial: Optional[Sequence[str]]) -> Optional[Set[str]]:
         allowed: Set[str] = set(DEFAULT_ALLOWLIST)
         if initial:
@@ -131,8 +155,17 @@ class DeepDiveExecutor:
         if file_env:
             allowed.update(self._parse_allowlist_file(Path(file_env)))
 
-        if "*" in allowed:
+        # NOTE: uploaded scripts are intentionally NOT auto-added to the
+        # allowlist. Letting an upload authorize its own execution meant any
+        # caller who could write a file could then run it. Uploaded scripts must
+        # now be allowlisted explicitly by the operator via DEEP_DIVE_ALLOWLIST
+        # or DEEP_DIVE_ALLOWLIST_FILE.
+
+        # The "*" wildcard (disable enforcement) is only honored when the
+        # operator opts in explicitly, never implicitly from a file/scripts dir.
+        if "*" in allowed and os.getenv("DEEP_DIVE_ALLOW_ALL", "").lower() in {"1", "true", "yes"}:
             return None
+        allowed.discard("*")
         return allowed
 
     def _parse_allowlist_source(self, source: str) -> Set[str]:
@@ -173,4 +206,8 @@ class DeepDiveExecutor:
         if self.allowlist is None:
             return True
         key = self._command_key(command)
-        return key in self.allowlist
+        # Check if key is absolute path to allowed script
+        if key in self.allowlist:
+             return True
+        # Check basename for standard commands
+        return key in self.allowlist or Path(key).name in self.allowlist
