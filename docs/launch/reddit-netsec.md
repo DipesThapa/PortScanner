@@ -1,5 +1,20 @@
 # Reddit — r/netsec (and fallbacks)
 
+## Account readiness (do this before you post anything)
+A brand-new account (e.g. an auto-generated `Word_Word1234` username with ~0
+karma) will get auto-removed by r/netsec and most quality subs. Reddit is a
+*later* channel, not a launch-day one.
+
+- Publish on **dev.to first** (no gate), then **Hacker News**, then **LinkedIn**.
+  Do Reddit once the account has some age + karma.
+- Spend ~2–3 weeks genuinely commenting in r/netsec, r/Python, r/cybersecurity
+  before submitting a link. Real participation, not karma-farming.
+- When ready, post to lower-bar subs first (r/Python, r/selfhosted,
+  r/cybersecurity); attempt r/netsec last.
+- Never buy karma or use vote services — bannable and useless as evidence.
+- Reddit karma is irrelevant to the visa; your name on dev.to/GitHub/LinkedIn is
+  what counts. Don't over-invest here.
+
 ## Read this first — r/netsec is strict
 r/netsec removes low-effort self-promotion and "I made a tool" posts. It rewards
 **technical writeups with real content**. Your post must be the *article link*,
