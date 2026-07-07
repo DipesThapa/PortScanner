@@ -3,7 +3,9 @@
 **Status:** verified. `semgrep --test` → `4/4 ✓`. Due-diligence done:
 - No existing `torch.load` / `joblib.load` / `pandas.read_pickle` /
   `numpy allow_pickle` rule in the registry (confirmed via code search).
-- `dill` is **already** covered by `avoid-dill`, so it's intentionally excluded.
+- The target folder (`python/lang/security/deserialization/`) currently ships only
+  `pickle`, `jsonpickle`, `pyyaml`, and `ruamel` rules — none cover these four ML
+  deserialisers, so the coverage is genuinely net-new (verified on `develop`).
 - Rule matches the repo's conventions: per-library `avoid-*` ids, their metadata
   format (owasp 2017/2021/2025, cwe2021/2022-top25 flags), and a `pattern-not`
   that skips constant-string args to reduce false positives.
@@ -24,9 +26,9 @@ git checkout develop
 git checkout -b add-ml-deserialization-rules
 
 # 2. Copy the two verified files in from your PortScanner repo:
-cp /path/to/PortScanner-main/docs/growth/contrib/ml-deserialization.yaml \
+cp "/Users/apple/Desktop/Code Projects/Projects/PortScanner-main/docs/growth/contrib/ml-deserialization.yaml" \
    python/lang/security/deserialization/ml-deserialization.yaml
-cp /path/to/PortScanner-main/docs/growth/contrib/ml-deserialization.py \
+cp "/Users/apple/Desktop/Code Projects/Projects/PortScanner-main/docs/growth/contrib/ml-deserialization.py" \
    python/lang/security/deserialization/ml-deserialization.py
 
 # 3. (optional but good) verify locally:
@@ -54,9 +56,10 @@ gh pr create --repo semgrep/semgrep-rules --base develop \
 > - `avoid-numpy-allow-pickle` - `numpy.load(..., allow_pickle=True)`
 >
 > These are the model-file attack surface (CWE-502) behind many recent AI/ML
-> CVEs. `dill` is already covered by `avoid-dill`, so it's excluded. Rules follow
-> the existing deserialization conventions (metadata, `avoid-*` ids, constant-
-> string `pattern-not` to reduce false positives). Tests pass via `semgrep --test`
-> (`4/4`). Resolves #3990.
+> CVEs. The `deserialization/` folder currently covers `pickle`, `jsonpickle`,
+> `pyyaml`, and `ruamel` but none of these four ML loaders, so this is net-new
+> coverage. Rules follow the existing deserialization conventions (metadata,
+> `avoid-*` ids, constant-string `pattern-not` to reduce false positives). Tests
+> pass via `semgrep --test` (`4/4`). Resolves #3990.
 
 Tip: reference the issue (`Resolves #3990`) so the PR links back to your proposal.
