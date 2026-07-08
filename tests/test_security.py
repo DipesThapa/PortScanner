@@ -41,7 +41,8 @@ def test_health_is_open(client):
 
 
 def test_delete_missing_job_returns_404(client):
-    assert client.delete(f"/api/scans/{uuid.uuid4()}", headers=KEY).status_code == 404
+    response = client.delete(f"/api/scans/{uuid.uuid4()}", headers=KEY)
+    assert response.status_code == 404
 
 
 # --- T2: input validation / argument injection ------------------------------
