@@ -102,7 +102,7 @@ function App() {
     async (jobId) => {
       if (!jobId) return [];
       try {
-        const response = await API.get(`/scans/${jobId}/deepdive`);
+        const response = await API.get(`/scans/${encodeURIComponent(jobId)}/deepdive`);
         const tasks = response.data || [];
         setDeepDiveTasks((prev) => ({
           ...prev,
@@ -247,7 +247,7 @@ function App() {
         Array.isArray(commands) && commands.length > 0
           ? { commands }
           : {};
-      await API.post(`/scans/${jobId}/deepdive`, payload);
+      await API.post(`/scans/${encodeURIComponent(jobId)}/deepdive`, payload);
       await loadDeepDiveTasks(jobId);
       setInfo("Deep-dive task queued");
     } catch (err) {
@@ -342,14 +342,14 @@ function App() {
 
   // --- Delete Scan ---
   const deleteScan = async (jobId) => {
-    console.log("Requesting delete for job:", jobId);
+    console.log("Requesting delete for job:", String(jobId).replace(/[\r\n]/g, ""));
     if (!confirm("Are you sure you want to delete this scan? This action cannot be undone.")) {
       console.log("Delete cancelled by user");
       return;
     }
     try {
       console.log("Sending DELETE request...");
-      await API.delete(`/scans/${jobId}`);
+      await API.delete(`/scans/${encodeURIComponent(jobId)}`);
       console.log("DELETE successful");
       // Remove from local state
       setScans(prev => prev.filter(s => s.job_id !== jobId));
