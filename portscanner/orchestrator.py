@@ -8,7 +8,7 @@ import json
 import socket
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -23,8 +23,27 @@ class DistributedRunner:
         self.workers = workers
 
     @classmethod
-    def from_config(cls, path: str) -> "DistributedRunner":
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    def from_config(
+        cls, path: str, *, base_dir: Optional[str] = None
+    ) -> "DistributedRunner":
+        # Guard against path traversal: when a base directory is supplied the
+        # resolved config path must stay inside it. This prevents untrusted
+        # input (e.g. an HTTP query parameter) from reading arbitrary files
+        # such as /etc/passwd via ?config=../../etc/passwd.
+        config_path = Path(path)
+        if base_dir is not None:
+            base = Path(base_dir).resolve()
+            candidate = config_path if config_path.is_absolute() else base / config_path
+            resolved = candidate.resolve()
+            try:
+                resolved.relative_to(base)
+            except ValueError as exc:
+                raise ValueError(
+                    "Distributed runner config path escapes the permitted directory."
+                ) from exc
+            config_path = resolved
+
+        data = json.loads(config_path.read_text(encoding="utf-8"))
         worker_entries = data.get("workers", []) if isinstance(data, dict) else data
         workers: List[WorkerNode] = []
         if not isinstance(worker_entries, list):

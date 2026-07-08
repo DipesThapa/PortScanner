@@ -7,7 +7,7 @@ from __future__ import annotations
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
 DEFAULT_SCRIPTS = ["vuln"]
 

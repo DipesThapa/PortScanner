@@ -411,6 +411,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             scheduler = JobScheduler.from_file(args.job_file)
         except (ValueError, json.JSONDecodeError) as exc:
             parser_obj.error(f"Failed to load job file: {exc}")
+            return  # parser_obj.error() exits; explicit return keeps flow analysis happy
         plan_text = scheduler.render_plan()
         print(plan_text)
         for job in scheduler.jobs:
@@ -664,10 +665,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 print(trend_text)
         trend_text = baseline_store.render_trend() if baseline_store else ""
         if api_listen:
-            if api_server is None:
-                api_server = start_api_server(api_listen, summary_data, diff_results, trend_text)
-            else:
-                api_server.update(summary_data, diff_results, trend_text)
+            api_server = start_api_server(api_listen, summary_data, diff_results, trend_text)
         export_payload = {
             "mode": "xml-run",
             "summary": summary_data,
@@ -855,10 +853,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         trend_text = ""
 
     if api_listen:
-        if api_server is None:
-            api_server = start_api_server(api_listen, summary, diff_results, trend_text)
-        else:
-            api_server.update(summary, diff_results, trend_text)
+        api_server = start_api_server(api_listen, summary, diff_results, trend_text)
 
     export_payload = {
         "mode": "batch-run",

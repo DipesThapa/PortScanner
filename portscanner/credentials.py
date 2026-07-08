@@ -56,7 +56,7 @@ class CredentialStore:
                         if secret_value is None:
                             raise ValueError(f"Secret '{secret_key}' not found for service {service}.")
                         record[key] = secret_value
-        return cls(data, provider)
+        return cls(data, secret_provider)
 
     @classmethod
     def from_sources(
