@@ -7,9 +7,9 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from pydantic import BaseModel
-from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -24,12 +24,8 @@ from .models import (
     ScheduleResponse,
     ScheduledJob,
     WorkerStatus,
-    ScheduleResponse,
-    ScheduledJob,
-    WorkerStatus,
     WorkerNodeRecord,
     DeepDiveTask,
-    DeepDiveTaskRecord,
     DeepDiveRequest,
 )
 from .deepdive import DeepDiveExecutor
@@ -220,9 +216,12 @@ def run_schedule(schedule_id: str, background: BackgroundTasks) -> ScanResponse:
 
 
 @api_router.get("/workers", response_model=list[WorkerStatus])
-def worker_status(config: str | None = None) -> list[WorkerStatus]:
-    # 1. Load workers from config file (if any)
-    config_path = config or default_orchestrator_config
+def worker_status() -> list[WorkerStatus]:
+    # 1. Load workers from the server-configured orchestrator file, if any.
+    # The path is taken only from the ORCHESTRATOR_CONFIG environment variable
+    # (operator-controlled) and never from client input, so an HTTP caller
+    # cannot coerce the server into reading arbitrary files.
+    config_path = default_orchestrator_config
     file_workers: list[Any] = []
     if config_path:
         try:

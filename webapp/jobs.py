@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import logging
 import os
 import re
 import shutil
@@ -13,6 +14,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastapi import BackgroundTasks
+
+logger = logging.getLogger(__name__)
 
 from portscanner import cli
 from portscanner.baselines import BaselineStore
@@ -332,7 +335,7 @@ class JobManager:
                 result.plugins = data.get("plugins")
                 result.vulnerabilities = self._extract_vulnerabilities(data, result.plugins)
             except json.JSONDecodeError:
-                pass
+                logger.debug("Ignoring malformed result JSON for job result", exc_info=True)
 
         baseline_dir = job_dir / "baseline"
         if baseline_dir.exists():

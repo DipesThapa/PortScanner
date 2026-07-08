@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import shlex
 import subprocess
@@ -12,6 +13,8 @@ from typing import Iterable, List, Optional, Sequence, Set
 
 from .models import DeepDiveTaskRecord, DeepDiveTask, job_directory
 from .database import get_session
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_ALLOWLIST: Set[str] = {"testssl.sh", "nmap", "nuclei"}
 
@@ -186,7 +189,7 @@ class DeepDiveExecutor:
             if isinstance(data, dict):
                 return {str(item).strip() for item in data.get("commands", []) if str(item).strip()}
         except json.JSONDecodeError:
-            pass
+            logger.debug("Command list JSON invalid; falling back to line parsing", exc_info=True)
         return {line.strip() for line in content.splitlines() if line.strip()}
 
     def _command_key(self, command: str) -> str:
