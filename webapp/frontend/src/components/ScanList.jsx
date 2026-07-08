@@ -63,26 +63,6 @@ function ScanList({ scans, selectedId, onSelect, loading, onDelete }) {
     setScrollMeta({ canPrev, canNext, page, totalPages, rangeStart, rangeEnd });
   }, [scans.length]);
 
-  const scrollByPage = useCallback(
-    (direction) => {
-      const el = listRef.current;
-      if (!el) return;
-      const firstItem = el.firstElementChild;
-      const styles = window.getComputedStyle(el);
-      const gap = parseFloat(styles.rowGap || styles.gap || "0");
-      let step = el.clientHeight;
-      if (firstItem) {
-        const itemHeight = firstItem.getBoundingClientRect().height + gap;
-        step = Math.max(itemHeight * PAGE_SIZE, 1);
-      }
-      el.scrollBy({ top: direction * step, behavior: "smooth" });
-      window.requestAnimationFrame(() => {
-        setTimeout(calculateMeta, 180);
-      });
-    },
-    [calculateMeta],
-  );
-
   useEffect(() => {
     calculateMeta();
   }, [calculateMeta, scans.length]);

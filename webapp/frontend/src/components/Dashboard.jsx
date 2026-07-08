@@ -12,7 +12,6 @@ function Dashboard({ scans, loading }) {
   }
 
   const running = scans.filter((scan) => scan.status === "running").length;
-  const failed = scans.filter((scan) => scan.status === "failed").length;
 
   // Aggregate totals from completed scans
   let totalHosts = 0;
