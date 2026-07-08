@@ -55,7 +55,7 @@ function App() {
   const [deepDiveTasks, setDeepDiveTasks] = useState({});
   const [deepDiveAllowlist, setDeepDiveAllowlist] = useState({ entries: [], enforced: true });
 
-  const [connected, setConnected] = useState(false);
+  const [, setConnected] = useState(false);
 
   const loadWorkers = async () => {
     try {
