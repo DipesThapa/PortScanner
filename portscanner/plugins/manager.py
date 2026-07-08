@@ -5,7 +5,7 @@ Simple plugin manager that loads and orchestrates scan plugins.
 from __future__ import annotations
 
 import importlib
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Type
+from typing import Dict, List, Optional, Sequence, Tuple, Type
 
 from .base import PluginContext, ScanPlugin
 
