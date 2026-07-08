@@ -46,3 +46,8 @@ Thumbs.db
 
 # Local Claude Code settings (per-machine, not for the repo)
 .claude/settings.local.json
+
+# Personal launch/growth strategy notes — keep local, not for public repo
+docs/launch/
+docs/growth/huntr-target-shortlist.md
+docs/growth/oss-contribution-and-cve-plan.md
